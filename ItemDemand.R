@@ -84,3 +84,112 @@ bestTune <- CV_results %>%
 final_wf <- forest_workflow %>%
   finalize_workflow(bestTune) %>%
   fit(data = amazon_tr)
+
+##11/17/2023
+install.packages("modeltime")
+
+library(modeltime)
+library(timetk)
+
+item_1_1 <- item_train %>%
+  filter(store == 1, item == 1)
+
+item_1_3 <- item_train %>%
+  filter(store == 1, item == 3)
+
+cv_split <- time_series_split(item_1_1, assess="3 months", cumulative = TRUE)
+
+cv_split %>%
+  tk_time_series_cv_plan() %>%
+  plot_time_series_cv_plan(date, sales, .interactive=FALSE)
+
+es_model <- exp_smoothing() %>%
+  set_engine("ets") %>%
+  fit(sales~date, data = training(cv_split))
+
+cv_results <- modeltime_calibrate(es_model,
+                                  new_data = testing(cv_split))
+
+p1 <- cv_results %>%
+  modeltime_forecast(
+    new_data = testing(cv_split),
+    actual_data = item_1_1) %>%
+      plot_modeltime_forecast(.interactive = TRUE)
+
+
+cv_results %>%
+  modeltime_accuracy() %>%
+  table_modeltime_accuracy(
+    .interactive = FALSE
+  )
+
+es_fullfit <- cv_results %>%
+  modeltime_refit(data = item_1_1)
+
+
+test_1_1 <- item_test %>%
+  filter(item == 1, store == 1)
+
+es_preds <- es_fullfit %>%
+  modeltime_forecast(h = "3 months") %>%
+  rename(date=.index, sales=.value) %>%
+  select(date, sales) %>%
+  full_join(., y=test_1_1, by="date") %>%
+  select(id, sales)
+
+
+p3 <- es_fullfit %>%
+  modeltime_forecast(h = "3 months", actual_data = item_1_1) %>%
+  plot_modeltime_forecast(.interactive = FALSE)
+
+
+item_1_3 <- item_train %>%
+  filter(store == 1, item == 3)
+
+cv_split <- time_series_split(item_1_3, assess="3 months", cumulative = TRUE)
+
+cv_split %>%
+  tk_time_series_cv_plan() %>%
+  plot_time_series_cv_plan(date, sales, .interactive=FALSE)
+
+es_model <- exp_smoothing() %>%
+  set_engine("ets") %>%
+  fit(sales~date, data = training(cv_split))
+
+cv_results <- modeltime_calibrate(es_model,
+                                  new_data = testing(cv_split))
+
+p2 <- cv_results %>%
+  modeltime_forecast(
+    new_data = testing(cv_split),
+    actual_data = item_1_3) %>%
+  plot_modeltime_forecast(.interactive = TRUE)
+
+
+cv_results %>%
+  modeltime_accuracy() %>%
+  table_modeltime_accuracy(
+    .interactive = FALSE
+  )
+
+es_fullfit <- cv_results %>%
+  modeltime_refit(data = item_1_3)
+
+test_1_3 <- item_test %>%
+  filter(item == 3, store == 1)
+
+es_preds <- es_fullfit %>%
+  modeltime_forecast(h = "3 months") %>%
+  rename(date=.index, sales=.value) %>%
+  select(date, sales) %>%
+  full_join(., y=test, by="date") %>%
+  select(id, sales)
+
+
+p4 <- es_fullfit %>%
+  modeltime_forecast(h = "3 months", actual_data = item_1_3) %>%
+  plot_modeltime_forecast(.interactive = FALSE)
+
+
+
+
