@@ -182,7 +182,7 @@ es_preds <- es_fullfit %>%
   modeltime_forecast(h = "3 months") %>%
   rename(date=.index, sales=.value) %>%
   select(date, sales) %>%
-  full_join(., y=test, by="date") %>%
+  full_join(., y=test_1_3, by="date") %>%
   select(id, sales)
 
 
@@ -190,6 +190,272 @@ p4 <- es_fullfit %>%
   modeltime_forecast(h = "3 months", actual_data = item_1_3) %>%
   plot_modeltime_forecast(.interactive = FALSE)
 
+library(plotly)
+
+plotly::subplot(p1, p2, p3, p4, nrows = 2)
+
+###11-27-23 ARIMA
+library(tidymodels)
+library(embed)
+
+library(modeltime)
+library(timetk)
+
+install.packages("forecast")
+library(forecast)
+
+item_1_1 <- item_train %>%
+  filter(store == 1, item == 1)
+
+ts_recipe <- recipe(sales ~ ., data = item_1_1) %>%
+  step_date(date, features = c("doy", "dow", "month")) %>%
+  step_range(date_doy, min = 0, max = pi) %>%
+  step_mutate(sinDOY = sin(date_doy), cosDOY = cos(date_doy))
+prep <- prep(ts_recipe)
+baked_tr <- bake(prep, new_data = item_1_1)
+
+cv_split <- time_series_split(baked_tr, assess="3 months", cumulative = TRUE)
+
+#Create arima model
+arima_model <- arima_reg(seasonal_period = 365,
+                         non_seasonal_ar = 5,
+                         non_seasonal_ma = 5,
+                         seasonal_ar = 2,
+                         seasonal_ma = 2,
+                         non_seasonal_differences = 2,
+                         seasonal_differences =  2
+                         ) %>%
+  set_engine("auto_arima")
+
+#initialize arima workflow
+arima_wf <- workflow() %>%
+  add_recipe(ts_recipe) %>%
+  add_model(arima_model) %>%
+  fit(data=training(cv_split))
+
+#calibrate
+cv_results <- modeltime_calibrate(arima_wf,
+                                  new_data = testing(cv_split))
+#plot calibrations
+p1 <- cv_results %>%
+  modeltime_forecast(
+    new_data = testing(cv_split),
+    actual_data = baked_tr) %>%
+  plot_modeltime_forecast(.interactive = TRUE)
+
+#check
+p1
+
+#refit the data
+arima_fullfit <- cv_results %>%
+  modeltime_refit(data = baked_tr)
+
+#subset test data
+test_1_1 <- item_test %>%
+  filter(item == 1, store == 1)
+baked_test <- bake(prep, new_data = test_1_1)
+
+#create predictions
+arima_preds <- arima_fullfit %>%
+  modeltime_forecast(new_data = baked_test) %>%
+  rename(date=.index, sales=.value) %>%
+  select(date, sales) %>%
+  full_join(., y=baked_test, by="date") %>%
+  select(date, sales)
+
+p3 <- arima_fullfit %>%
+  modeltime_forecast(new_data = baked_test, actual_data = baked_tr) %>%
+  plot_modeltime_forecast(.interactive = FALSE)
+
+p3
 
 
 
+item_1_3 <- item_train %>%
+  filter(store == 1, item == 3)
+
+ts_recipe <- recipe(sales ~ ., data = item_1_3) %>%
+  step_date(date, features = c("doy", "dow", "month")) %>%
+  step_range(date_doy, min = 0, max = pi) %>%
+  step_mutate(sinDOY = sin(date_doy), cosDOY = cos(date_doy))
+prep <- prep(ts_recipe)
+baked_tr <- bake(prep, new_data = item_1_3)
+
+cv_split <- time_series_split(baked_tr, assess="3 months", cumulative = TRUE)
+
+#Create arima model
+arima_model <- arima_reg(seasonal_period = 365,
+                         non_seasonal_ar = 5,
+                         non_seasonal_ma = 5,
+                         seasonal_ar = 2,
+                         seasonal_ma = 2,
+                         non_seasonal_differences = 2,
+                         seasonal_differences =  2
+) %>%
+  set_engine("auto_arima")
+
+#initialize arima workflow
+arima_wf <- workflow() %>%
+  add_recipe(ts_recipe) %>%
+  add_model(arima_model) %>%
+  fit(data=training(cv_split))
+
+#calibrate
+cv_results <- modeltime_calibrate(arima_wf,
+                                  new_data = testing(cv_split))
+#plot calibrations
+p2 <- cv_results %>%
+  modeltime_forecast(
+    new_data = testing(cv_split),
+    actual_data = baked_tr) %>%
+  plot_modeltime_forecast(.interactive = TRUE)
+
+#check
+p2
+
+#refit the data
+arima_fullfit <- cv_results %>%
+  modeltime_refit(data = baked_tr)
+
+#subset test data
+test_1_3 <- item_test %>%
+  filter(item == 1, store == 3)
+baked_test <- bake(prep, new_data = test_1_3)
+
+#create predictions
+arima_preds <- arima_fullfit %>%
+  modeltime_forecast(new_data = baked_test) %>%
+  rename(date=.index, sales=.value) %>%
+  select(date, sales) %>%
+  full_join(., y=baked_test, by="date") %>%
+  select(date, sales)
+
+p4 <- arima_fullfit %>%
+  modeltime_forecast(new_data = baked_test, actual_data = baked_tr) %>%
+  plot_modeltime_forecast(.interactive = FALSE)
+
+p4
+
+library(plotly)
+
+plotly::subplot(p1, p2, p3, p4, nrows = 2)
+
+###11-29-2023 Facebook Prophet Model
+library(tidymodels)
+library(embed)
+
+library(modeltime)
+library(timetk)
+library(forecast)
+
+item_1_1 <- item_train %>%
+  filter(store == 1, item == 1)
+
+ts_recipe <- recipe(sales ~ ., data = item_1_1) %>%
+  step_date(date, features = c("doy", "dow", "month")) %>%
+  step_range(date_doy, min = 0, max = pi) %>%
+  step_mutate(sinDOY = sin(date_doy), cosDOY = cos(date_doy))
+prep <- prep(ts_recipe)
+baked_tr <- bake(prep, new_data = item_1_1)
+
+cv_split <- time_series_split(baked_tr, assess="3 months", cumulative = TRUE)
+
+#Create arima model
+prophet_model <- prophet_reg() %>%
+  set_engine("prophet") %>%
+  fit(sales ~ date, data = training(cv_split))
+
+#calibrate
+cv_results <- modeltime_calibrate(prophet_model,
+                                  new_data = testing(cv_split))
+#plot calibrations
+p1 <- cv_results %>%
+  modeltime_forecast(
+    new_data = testing(cv_split),
+    actual_data = baked_tr) %>%
+  plot_modeltime_forecast(.interactive = TRUE)
+
+#check
+p1
+
+#refit the data
+prophet_fullfit <- cv_results %>%
+  modeltime_refit(data = baked_tr)
+
+#subset test data
+test_1_1 <- item_test %>%
+  filter(item == 1, store == 1)
+baked_test <- bake(prep, new_data = test_1_1)
+
+#create predictions
+prophet_preds <- prophet_fullfit %>%
+  modeltime_forecast(new_data = baked_test) %>%
+  rename(date=.index, sales=.value) %>%
+  select(date, sales) %>%
+  full_join(., y=baked_test, by="date") %>%
+  select(date, sales)
+
+p3 <- prophet_fullfit %>%
+  modeltime_forecast(new_data = baked_test, actual_data = baked_tr) %>%
+  plot_modeltime_forecast(.interactive = FALSE)
+
+p3
+###
+###OTHER ITEM
+###
+item_1_3 <- item_train %>%
+  filter(store == 1, item == 3)
+
+ts_recipe <- recipe(sales ~ ., data = item_1_3) %>%
+  step_date(date, features = c("doy", "dow", "month")) %>%
+  step_range(date_doy, min = 0, max = pi) %>%
+  step_mutate(sinDOY = sin(date_doy), cosDOY = cos(date_doy))
+prep <- prep(ts_recipe)
+baked_tr <- bake(prep, new_data = item_1_3)
+
+cv_split <- time_series_split(baked_tr, assess="3 months", cumulative = TRUE)
+
+#Create arima model
+prophet_model <- prophet_reg() %>%
+  set_engine("prophet") %>%
+  fit(sales ~ date, data = training(cv_split))
+
+#calibrate
+cv_results <- modeltime_calibrate(prophet_model,
+                                  new_data = testing(cv_split))
+#plot calibrations
+p2 <- cv_results %>%
+  modeltime_forecast(
+    new_data = testing(cv_split),
+    actual_data = baked_tr) %>%
+  plot_modeltime_forecast(.interactive = TRUE)
+
+#check
+p2
+
+#refit the data
+prophet_fullfit <- cv_results %>%
+  modeltime_refit(data = baked_tr)
+
+#subset test data
+test_1_3 <- item_test %>%
+  filter(item == 1, store == 1)
+baked_test <- bake(prep, new_data = test_1_3)
+
+#create predictions
+prophet_preds <- prophet_fullfit %>%
+  modeltime_forecast(new_data = baked_test) %>%
+  rename(date=.index, sales=.value) %>%
+  select(date, sales) %>%
+  full_join(., y=baked_test, by="date") %>%
+  select(date, sales)
+
+p4 <- prophet_fullfit %>%
+  modeltime_forecast(new_data = baked_test, actual_data = baked_tr) %>%
+  plot_modeltime_forecast(.interactive = FALSE)
+
+p4
+
+library(plotly)
+
+plotly::subplot(p1, p2, p3, p4, nrows = 2)
